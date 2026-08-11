@@ -9,8 +9,8 @@ android {
         applicationId "com.fouad.hyperos3studio"
         minSdk 24
         targetSdk 34
-        versionCode 12
-        versionName "12.0-Fixed"
+        versionCode 13
+        versionName "13.0-UltraFix"
     }
     buildTypes { release { minifyEnabled false } }
     compileOptions {

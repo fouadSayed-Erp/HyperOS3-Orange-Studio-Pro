@@ -10,7 +10,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -22,14 +21,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,334 +31,241 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import kotlin.math.roundToInt
 
 data class ThemePart(val id:String, val title:String, val emoji:String)
 
 fun buildRealMtz(context: Context, parts: List<ThemePart>): File {
-    val themeName = "HyperOS_Orange_Fouad"
-    val outFile = File(context.getExternalFilesDir(null), "$themeName.mtz")
-    ZipOutputStream(FileOutputStream(outFile)).use { zip ->
-        val desc = "<?xml version=\"1.0\" encoding=\"utf-8\"?><MIUI-Theme><title>$themeName</title><designer>Fouad</designer></MIUI-Theme>"
+    val name = "HyperOS_Orange_Fouad"
+    val out = File(context.getExternalFilesDir(null), "$name.mtz")
+    ZipOutputStream(FileOutputStream(out)).use { zip ->
+        val desc = "<?xml version=\"1.0\"?><MIUI-Theme><title>$name</title><designer>Fouad</designer></MIUI-Theme>"
         zip.putNextEntry(ZipEntry("description.xml"))
         zip.write(desc.toByteArray())
         zip.closeEntry()
     }
-    try {
-        val dest = File("/storage/emulated/0/Download/$themeName.mtz")
-        outFile.copyTo(dest, true)
-    } catch(e:Exception){}
-    return outFile
+    try { out.copyTo(File("/storage/emulated/0/Download/$name.mtz"), true) } catch(e:Exception){}
+    return out
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { AppContent() }
+        setContent { StudioApp() }
     }
 }
 
 @Composable
-fun AppContent() {
+fun StudioApp(){
     val orange = Color(0xFFFF6A00)
     val dark = Color(0xFF0F0F0F)
-    var selectedTab by remember { mutableStateOf(0) }
+    var tab by remember { mutableStateOf(0) }
     var iconShape by remember { mutableStateOf(20) }
     var iconColor by remember { mutableStateOf(orange) }
     var statusColor by remember { mutableStateOf(orange) }
-    var systemBlur by remember { mutableStateOf(50f) }
+    var blur by remember { mutableStateOf(50f) }
     var selectedBrush by remember { mutableStateOf<Brush?>(null) }
-    var generatedWallpapers by remember { mutableStateOf(listOf<Brush>()) }
-    var draggingItem by remember { mutableStateOf<ThemePart?>(null) }
-    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var brushes by remember { mutableStateOf(listOf<Brush>()) }
     val ctx = LocalContext.current
 
-    val sourceParts = listOf(
+    val allParts = listOf(
         ThemePart("icons","Icons","🎨"),
-        ThemePart("wallpaper","Wall","🖼️"),
+        ThemePart("wall","Wall","🖼️"),
         ThemePart("control","Control","🎛️"),
         ThemePart("systemui","SystemUI","📱"),
         ThemePart("boot","Boot","🚀"),
         ThemePart("lock","Lock","🔒")
     )
+    var dropped by remember { mutableStateOf(listOf<ThemePart>()) }
 
-    var droppedIcons by remember { mutableStateOf(listOf<ThemePart>()) }
-    var droppedSystem by remember { mutableStateOf(listOf<ThemePart>()) }
-    var droppedLock by remember { mutableStateOf(listOf<ThemePart>()) }
-    var droppedBoot by remember { mutableStateOf(listOf<ThemePart>()) }
-
-    var iconsRect by remember { mutableStateOf(Rect.Zero) }
-    var systemRect by remember { mutableStateOf(Rect.Zero) }
-    var lockRect by remember { mutableStateOf(Rect.Zero) }
-    var bootRect by remember { mutableStateOf(Rect.Zero) }
-
-    fun handleDrop(pos: Offset, item: ThemePart){
-        when {
-            iconsRect.contains(pos) -> if(!droppedIcons.contains(item)) droppedIcons = droppedIcons + item
-            systemRect.contains(pos) -> if(!droppedSystem.contains(item)) droppedSystem = droppedSystem + item
-            lockRect.contains(pos) -> if(!droppedLock.contains(item)) droppedLock = droppedLock + item
-            bootRect.contains(pos) -> if(!droppedBoot.contains(item)) droppedBoot = droppedBoot + item
-        }
-    }
-
-    MaterialTheme(colorScheme = darkColorScheme(primary = orange, background = dark, surface = Color(0xFF1A1A1A))) {
+    MaterialTheme(colorScheme = darkColorScheme(primary=orange, background=dark, surface=Color(0xFF1A1A1A))){
         Scaffold(
-            topBar = {
-                CenterAlignedTopAppBar(
-                    title = { Text("HyperOS 3 Orange Studio Pro", fontWeight=FontWeight.Black, fontSize=14.sp, color=Color.Black) },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor=orange)
-                )
-            },
+            topBar = { CenterAlignedTopAppBar(title={ Text("HyperOS 3 Orange Studio Pro", fontWeight=FontWeight.Black, fontSize=13.sp, color=Color.Black) }, colors=TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor=orange)) },
             bottomBar = {
                 NavigationBar(containerColor=Color(0xFF1A1A1A)){
-                    NavigationBarItem(selected=selectedTab==0, onClick={selectedTab=0}, icon={Text("🖱️")}, label={Text("Drag", fontSize=8.sp)})
-                    NavigationBarItem(selected=selectedTab==1, onClick={selectedTab=1}, icon={Text("🎨")}, label={Text("Icons", fontSize=8.sp)})
-                    NavigationBarItem(selected=selectedTab==2, onClick={selectedTab=2}, icon={Text("📱")}, label={Text("UI", fontSize=8.sp)})
-                    NavigationBarItem(selected=selectedTab==3, onClick={selectedTab=3}, icon={Text("🖼️")}, label={Text("Wall", fontSize=8.sp)})
-                    NavigationBarItem(selected=selectedTab==4, onClick={selectedTab=4}, icon={Text("👁️")}, label={Text("Preview", fontSize=8.sp)})
+                    NavigationBarItem(selected=tab==0, onClick={tab=0}, icon={Text("🧩")}, label={Text("Parts", fontSize=7.sp)})
+                    NavigationBarItem(selected=tab==1, onClick={tab=1}, icon={Text("🎨")}, label={Text("Icons", fontSize=7.sp)})
+                    NavigationBarItem(selected=tab==2, onClick={tab=2}, icon={Text("📱")}, label={Text("System", fontSize=7.sp)})
+                    NavigationBarItem(selected=tab==3, onClick={tab=3}, icon={Text("🖼️")}, label={Text("Wall", fontSize=7.sp)})
+                    NavigationBarItem(selected=tab==4, onClick={tab=4}, icon={Text("👁️")}, label={Text("Preview", fontSize=7.sp)})
                 }
             }
         ){ pad ->
             Box(Modifier.fillMaxSize().background(dark).padding(pad)){
-                when(selectedTab){
-                    0 -> DragTab(sourceParts, { item, offset -> draggingItem=item; dragOffset=offset }, { offset, item -> handleDrop(offset, item); draggingItem=null }, { amt -> dragOffset+=amt }, { rect -> iconsRect=rect }, { rect -> systemRect=rect }, { rect -> lockRect=rect }, { rect -> bootRect=rect }, droppedIcons, droppedSystem, droppedLock, droppedBoot, orange, ctx)
-                    1 -> IconsTab(iconShape, { iconShape=it }, iconColor, { iconColor=it }, orange)
-                    2 -> SystemUITab(statusColor, { statusColor=it }, systemBlur, { systemBlur=it }, orange)
-                    3 -> WallpaperTab(generatedWallpapers, { generatedWallpapers=it }, selectedBrush, { selectedBrush=it }, orange)
-                    4 -> PreviewTab(iconShape, iconColor, statusColor, selectedBrush, dark)
-                }
-                draggingItem?.let { item ->
-                    Card(
-                        modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset(dragOffset.x.roundToInt(), dragOffset.y.roundToInt()) }.width(72.dp).height(72.dp).border(2.dp, Color.White, RoundedCornerShape(12.dp)),
-                        shape=RoundedCornerShape(12.dp),
-                        colors=CardDefaults.cardColors(containerColor=orange)
-                    ){
-                        Column(Modifier.fillMaxSize(), verticalArrangement=Arrangement.Center, horizontalAlignment=Alignment.CenterHorizontally){
-                            Text(item.emoji, fontSize=18.sp)
-                            Text(item.title, color=Color.Black, fontSize=7.sp, fontWeight=FontWeight.Black)
+                when(tab){
+                    0 -> {
+                        LazyColumn(Modifier.fillMaxSize().padding(10.dp), verticalArrangement=Arrangement.spacedBy(8.dp)){
+                            item{ Text("اضغط على العنصر لاضافته - بديل السحب", color=Color.White, fontSize=11.sp, fontWeight=FontWeight.Bold) }
+                            item{
+                                LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                                    items(allParts){ part ->
+                                        Card(
+                                            Modifier.width(70.dp).height(70.dp).clickable{
+                                                if(!dropped.contains(part)) dropped = dropped + part
+                                                Toast.makeText(ctx, "${part.title} اضيف", Toast.LENGTH_SHORT).show()
+                                            },
+                                            shape=RoundedCornerShape(12.dp),
+                                            colors=CardDefaults.cardColors(containerColor=Color(0xFF1E1E1E))
+                                        ){
+                                            Column(Modifier.fillMaxSize(), verticalArrangement=Arrangement.Center, horizontalAlignment=Alignment.CenterHorizontally){
+                                                Text(part.emoji, fontSize=18.sp)
+                                                Text(part.title, color=Color.White, fontSize=7.sp, fontWeight=FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            item{
+                                Card(Modifier.fillMaxWidth().height(110.dp).border(1.dp, orange, RoundedCornerShape(12.dp)), shape=RoundedCornerShape(12.dp), colors=CardDefaults.cardColors(containerColor=Color(0xFF151515))){
+                                    Column(Modifier.padding(8.dp)){
+                                        Text("الثيم الحالي (${dropped.size})", color=orange, fontSize=10.sp, fontWeight=FontWeight.Black)
+                                        dropped.forEach{ Text("• ${it.emoji} ${it.title}", color=Color.White, fontSize=9.sp) }
+                                        if(dropped.isEmpty()) Text("اضغط على العناصر فوق", color=Color.Gray, fontSize=8.sp)
+                                    }
+                                }
+                            }
+                            item{
+                                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                                    Button(onClick={ dropped = emptyList() }, colors=ButtonDefaults.buttonColors(containerColor=Color.Gray)){ Text("Clear", fontSize=10.sp) }
+                                    Button(onClick={
+                                        if(dropped.isEmpty()) Toast.makeText(ctx,"اضف عناصر الاول", Toast.LENGTH_SHORT).show()
+                                        else { val f=buildRealMtz(ctx, dropped); Toast.makeText(ctx,"✅ ${f.name} في Download", Toast.LENGTH_LONG).show() }
+                                    }, modifier=Modifier.weight(1f), colors=ButtonDefaults.buttonColors(containerColor=orange)){ Text("BUILD MTZ (${dropped.size})", color=Color.Black, fontWeight=FontWeight.Black, fontSize=10.sp) }
+                                }
+                            }
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun DragTab(parts: List<ThemePart>, onDragStart:(ThemePart, Offset)->Unit, onDragEnd:(Offset, ThemePart)->Unit, onDrag:(Offset)->Unit, onIconsRect:(Rect)->Unit, onSystemRect:(Rect)->Unit, onLockRect:(Rect)->Unit, onBootRect:(Rect)->Unit, droppedIcons:List<ThemePart>, droppedSystem:List<ThemePart>, droppedLock:List<ThemePart>, droppedBoot:List<ThemePart>, orange:Color, ctx:Context){
-    LazyColumn(Modifier.fillMaxSize().padding(10.dp), verticalArrangement=Arrangement.spacedBy(8.dp)){
-        item{ Text("Drag & Drop - اسحب لتكوين الثيم", color=Color.White, fontSize=11.sp, fontWeight=FontWeight.Bold) }
-        item{
-            LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                items(parts){ part ->
-                    var startPos by remember { mutableStateOf(Offset.Zero) }
-                    Card(
-                        modifier = Modifier.width(72.dp).height(72.dp).onGloballyPositioned{
-                            val p = it.positionInWindow()
-                            startPos = p + Offset(it.size.width/2f, it.size.height/2f)
-                        }.pointerInput(part){
-                            detectDragGestures(
-                                onDragStart={ onDragStart(part, startPos) },
-                                onDragEnd={ onDragEnd(startPos, part) },
-                                onDrag={ _, amt -> onDrag(amt) }
-                            )
-                        },
-                        shape=RoundedCornerShape(12.dp),
-                        colors=CardDefaults.cardColors(containerColor=Color(0xFF1E1E1E))
-                    ){
-                        Column(Modifier.fillMaxSize(), verticalArrangement=Arrangement.Center, horizontalAlignment=Alignment.CenterHorizontally){
-                            Text(part.emoji, fontSize=18.sp)
-                            Text(part.title, color=Color.White, fontSize=7.sp, fontWeight=FontWeight.Bold)
+                    1 -> {
+                        LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement=Arrangement.spacedBy(10.dp)){
+                            item{ Text("تخصيص الايقونات", color=Color.White, fontWeight=FontWeight.Black, fontSize=14.sp) }
+                            item{
+                                Card(shape=RoundedCornerShape(14.dp), colors=CardDefaults.cardColors(containerColor=Color(0xFF1E1E1E))){
+                                    Column(Modifier.padding(12.dp)){
+                                        Text("الشكل ${iconShape}dp", color=Color.Gray, fontSize=10.sp)
+                                        Slider(value=iconShape.toFloat(), onValueChange={iconShape=it.toInt()}, valueRange=0f..50f, colors=SliderDefaults.colors(thumbColor=orange, activeTrackColor=orange))
+                                        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                                            listOf(0,12,20,30,50).forEach{ r ->
+                                                Box(Modifier.size(40.dp).clip(RoundedCornerShape(r.dp)).background(iconColor).clickable{ iconShape=r }.border(1.dp, if(iconShape==r) Color.White else Color.Transparent, RoundedCornerShape(r.dp)), contentAlignment=Alignment.Center){ Text("📱", fontSize=14.sp) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            item{
+                                Card(shape=RoundedCornerShape(14.dp), colors=CardDefaults.cardColors(containerColor=Color(0xFF1E1E1E))){
+                                    Column(Modifier.padding(12.dp)){
+                                        Text("اللون", color=Color.Gray, fontSize=10.sp)
+                                        Spacer(Modifier.height(6.dp))
+                                        LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                                            items(listOf(Color(0xFFFF6A00), Color(0xFF00D1FF), Color(0xFF00FF88), Color(0xFFFF0055), Color.White, Color(0xFF9C27B0))){ c ->
+                                                Box(Modifier.size(34.dp).clip(CircleShape).background(c).border(2.dp, if(iconColor==c) Color.White else Color.Transparent, CircleShape).clickable{ iconColor=c })
+                                            }
+                                        }
+                                        Spacer(Modifier.height(6.dp))
+                                        Button(onClick={ iconColor = listOf(Color(0xFFFF6A00), Color(0xFF00D1FF), Color(0xFFFF0055), Color(0xFF00FF88)).random() }, colors=ButtonDefaults.buttonColors(containerColor=orange)){ Text("🎨 توليد لون", color=Color.Black, fontSize=9.sp, fontWeight=FontWeight.Black) }
+                                    }
+                                }
+                            }
+                            item{
+                                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(iconShape.dp)).background(iconColor), contentAlignment=Alignment.Center){ Text("📞", fontSize=20.sp) }
+                                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(iconShape.dp)).background(iconColor), contentAlignment=Alignment.Center){ Text("💬", fontSize=20.sp) }
+                                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(iconShape.dp)).background(iconColor), contentAlignment=Alignment.Center){ Text("📷", fontSize=20.sp) }
+                                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(iconShape.dp)).background(iconColor), contentAlignment=Alignment.Center){ Text("⚙️", fontSize=20.sp) }
+                                }
+                            }
                         }
                     }
-                }
-            }
-        }
-        item{
-            Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                DropBox("Icons Pack", droppedIcons, Modifier.weight(1f).onGloballyPositioned{ onIconsRect(it.boundsInWindow()) }, orange)
-                DropBox("SystemUI", droppedSystem, Modifier.weight(1f).onGloballyPositioned{ onSystemRect(it.boundsInWindow()) }, orange)
-            }
-        }
-        item{
-            Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                DropBox("Lockscreen", droppedLock, Modifier.weight(1f).onGloballyPositioned{ onLockRect(it.boundsInWindow()) }, orange)
-                DropBox("Boot", droppedBoot, Modifier.weight(1f).onGloballyPositioned{ onBootRect(it.boundsInWindow()) }, orange)
-            }
-        }
-        item{
-            val all = droppedIcons + droppedSystem + droppedLock + droppedBoot
-            Button(
-                onClick={
-                    if(all.isEmpty()){
-                        Toast.makeText(ctx,"اسحب عناصر الاول!", Toast.LENGTH_SHORT).show()
-                    } else {
-                        val f = buildRealMtz(ctx, all)
-                        Toast.makeText(ctx,"MTZ: ${f.name} في Download", Toast.LENGTH_LONG).show()
-                    }
-                },
-                modifier=Modifier.fillMaxWidth().height(48.dp),
-                colors=ButtonDefaults.buttonColors(containerColor=orange),
-                shape=RoundedCornerShape(12.dp)
-            ){
-                Text("BUILD MTZ NOW (${all.size})", color=Color.Black, fontWeight=FontWeight.Black, fontSize=11.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun IconsTab(iconShape:Int, onShape:(Int)->Unit, iconColor:Color, onColor:(Color)->Unit, orange:Color){
-    LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement=Arrangement.spacedBy(12.dp)){
-        item{ Text("تخصيص الايقونات", color=Color.White, fontWeight=FontWeight.Black, fontSize=14.sp) }
-        item{
-            Card(shape=RoundedCornerShape(16.dp), colors=CardDefaults.cardColors(containerColor=Color(0xFF1E1E1E))){
-                Column(Modifier.padding(12.dp)){
-                    Text("شكل الايقونة ${iconShape}dp", color=Color.Gray, fontSize=11.sp)
-                    Slider(value=iconShape.toFloat(), onValueChange={ onShape(it.toInt()) }, valueRange=0f..50f, colors=SliderDefaults.colors(thumbColor=orange, activeTrackColor=orange))
-                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                        listOf(0,12,20,30,50).forEach{ r ->
-                            Box(Modifier.size(42.dp).clip(RoundedCornerShape(r.dp)).background(iconColor).clickable{ onShape(r) }.border(2.dp, if(iconShape==r) Color.White else Color.Transparent, RoundedCornerShape(r.dp)), contentAlignment=Alignment.Center){ Text("📱", fontSize=16.sp) }
+                    2 -> {
+                        LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement=Arrangement.spacedBy(10.dp)){
+                            item{ Text("SystemUI & Lock Screen", color=Color.White, fontWeight=FontWeight.Black, fontSize=14.sp) }
+                            item{
+                                Card(shape=RoundedCornerShape(14.dp), colors=CardDefaults.cardColors(containerColor=Color(0xFF1E1E1E))){
+                                    Column(Modifier.padding(12.dp), verticalArrangement=Arrangement.spacedBy(6.dp)){
+                                        Text("Status Bar", color=orange, fontSize=11.sp, fontWeight=FontWeight.Bold)
+                                        Row(Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).padding(8.dp), verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.SpaceBetween){
+                                            Text("9:41", color=Color.White, fontSize=11.sp)
+                                            Box(Modifier.size(14.dp).clip(CircleShape).background(statusColor))
+                                        }
+                                        LazyRow(horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                                            items(listOf(Color(0xFFFF6A00), Color.Black, Color(0xFF00D1FF), Color.White)){ c ->
+                                                Box(Modifier.size(30.dp).clip(CircleShape).background(c).border(1.dp, if(statusColor==c) Color.White else Color.Gray, CircleShape).clickable{ statusColor=c })
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            item{
+                                Card(shape=RoundedCornerShape(14.dp), colors=CardDefaults.cardColors(containerColor=Color(0xFF1E1E1E))){
+                                    Column(Modifier.padding(12.dp)){
+                                        Text("Blur ${blur.toInt()}%", color=Color.White, fontSize=10.sp)
+                                        Slider(value=blur, onValueChange={blur=it}, valueRange=0f..100f, colors=SliderDefaults.colors(thumbColor=orange, activeTrackColor=orange))
+                                    }
+                                }
+                            }
                         }
                     }
-                }
-            }
-        }
-        item{
-            Card(shape=RoundedCornerShape(16.dp), colors=CardDefaults.cardColors(containerColor=Color(0xFF1E1E1E))){
-                Column(Modifier.padding(12.dp)){
-                    Text("لون الايقونات", color=Color.Gray, fontSize=11.sp)
-                    Spacer(Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                        items(listOf(Color(0xFFFF6A00), Color(0xFF00D1FF), Color(0xFF00FF88), Color(0xFFFF0055), Color.White, Color(0xFF9C27B0))){ c ->
-                            Box(Modifier.size(36.dp).clip(CircleShape).background(c).border(2.dp, if(iconColor==c) Color.White else Color.Transparent, CircleShape).clickable{ onColor(c) })
+                    3 -> {
+                        LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement=Arrangement.spacedBy(10.dp)){
+                            item{ Text("Wallpaper - توليد ثيمات", color=Color.White, fontWeight=FontWeight.Black, fontSize=14.sp) }
+                            item{
+                                Button(onClick={
+                                    val list = listOf(
+                                        Brush.linearGradient(listOf(Color(0xFFFF6A00), Color(0xFF1A1A1A))),
+                                        Brush.linearGradient(listOf(Color(0xFF00D1FF), Color.Black)),
+                                        Brush.linearGradient(listOf(Color(0xFFFF0055), Color(0xFFFF6A00))),
+                                        Brush.linearGradient(listOf(Color(0xFF00FF88), Color.Black)),
+                                        Brush.radialGradient(listOf(Color(0xFFFF6A00), Color.Black))
+                                    )
+                                    brushes = list
+                                    selectedBrush = list.random()
+                                }, modifier=Modifier.fillMaxWidth(), colors=ButtonDefaults.buttonColors(containerColor=orange)){ Text("🎨 توليد 5 خلفيات", color=Color.Black, fontWeight=FontWeight.Black, fontSize=11.sp) }
+                            }
+                            item{
+                                if(brushes.isNotEmpty()){
+                                    LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                                        items(brushes){ b ->
+                                            Box(Modifier.size(70.dp).clip(RoundedCornerShape(10.dp)).background(b).border(2.dp, if(selectedBrush==b) orange else Color.Transparent, RoundedCornerShape(10.dp)).clickable{ selectedBrush=b })
+                                        }
+                                    }
+                                }
+                            }
+                            item{
+                                if(selectedBrush!=null){
+                                    Box(Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(14.dp)).background(selectedBrush!!), contentAlignment=Alignment.Center){
+                                        Text("Lockscreen Wallpaper\n9:41", color=Color.White, fontWeight=FontWeight.Bold)
+                                    }
+                                }
+                            }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick={ onColor(listOf(Color(0xFFFF6A00), Color(0xFF00D1FF), Color(0xFFFF0055), Color(0xFF00FF88)).random()) }, colors=ButtonDefaults.buttonColors(containerColor=orange)){
-                        Text("🎨 توليد لون عشوائي", color=Color.Black, fontSize=10.sp, fontWeight=FontWeight.Black)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SystemUITab(statusColor:Color, onStatusColor:(Color)->Unit, blur:Float, onBlur:(Float)->Unit, orange:Color){
-    LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement=Arrangement.spacedBy(12.dp)){
-        item{ Text("تخصيص SystemUI", color=Color.White, fontWeight=FontWeight.Black, fontSize=14.sp) }
-        item{
-            Card(shape=RoundedCornerShape(16.dp), colors=CardDefaults.cardColors(containerColor=Color(0xFF1E1E1E))){
-                Column(Modifier.padding(12.dp), verticalArrangement=Arrangement.spacedBy(8.dp)){
-                    Text("Status Bar Color", color=orange, fontWeight=FontWeight.Bold, fontSize=12.sp)
-                    Row(Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).padding(8.dp), verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.SpaceBetween){
-                        Text("9:41", color=Color.White, fontSize=11.sp, fontWeight=FontWeight.Bold)
-                        Box(Modifier.size(16.dp).clip(CircleShape).background(statusColor))
-                    }
-                    LazyRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                        items(listOf(Color(0xFFFF6A00), Color.Transparent, Color.Black, Color(0xFF00D1FF), Color.White)){ c ->
-                            Box(Modifier.size(32.dp).clip(CircleShape).background(c).border(2.dp, if(statusColor==c) Color.White else Color.Gray.copy(0.3f), CircleShape).clickable{ onStatusColor(c) })
+                    4 -> {
+                        LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement=Arrangement.spacedBy(10.dp)){
+                            item{ Text("Live Preview", color=Color.White, fontWeight=FontWeight.Black, fontSize=13.sp) }
+                            item{
+                                Box(Modifier.fillMaxWidth().height(400.dp).clip(RoundedCornerShape(20.dp)).background(selectedBrush?: Brush.linearGradient(listOf(dark, Color(0xFF222222)))).border(2.dp, Color.Gray.copy(0.3f), RoundedCornerShape(20.dp))){
+                                    Column(Modifier.fillMaxSize()){
+                                        Row(Modifier.fillMaxWidth().height(30.dp).background(statusColor.copy(0.9f)).padding(horizontal=10.dp), verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.SpaceBetween){
+                                            Text("9:41", color=Color.White, fontSize=11.sp, fontWeight=FontWeight.Bold)
+                                            Text("39%", color=Color.White, fontSize=9.sp)
+                                        }
+                                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment=Alignment.Center){
+                                            Column(horizontalAlignment=Alignment.CenterHorizontally){
+                                                Text("Mon 12 May", color=Color.White.copy(0.7f), fontSize=10.sp)
+                                                Text("9:41", color=Color.White, fontSize=28.sp, fontWeight=FontWeight.Black)
+                                                Spacer(Modifier.height(10.dp))
+                                                Box(Modifier.size(54.dp).clip(RoundedCornerShape(iconShape.dp)).background(iconColor), contentAlignment=Alignment.Center){ Text("🔒", fontSize=22.sp) }
+                                            }
+                                        }
+                                        Row(Modifier.fillMaxWidth().height(60.dp).background(Color.Black.copy(0.5f)).padding(8.dp), horizontalArrangement=Arrangement.spacedBy(6.dp), verticalAlignment=Alignment.CenterVertically){
+                                            Box(Modifier.size(44.dp).clip(RoundedCornerShape(iconShape.dp)).background(iconColor), contentAlignment=Alignment.Center){ Text("📞", fontSize=16.sp) }
+                                            Box(Modifier.size(44.dp).clip(RoundedCornerShape(iconShape.dp)).background(iconColor), contentAlignment=Alignment.Center){ Text("💬", fontSize=16.sp) }
+                                            Box(Modifier.size(44.dp).clip(RoundedCornerShape(iconShape.dp)).background(iconColor), contentAlignment=Alignment.Center){ Text("📷", fontSize=16.sp) }
+                                            Box(Modifier.size(44.dp).clip(RoundedCornerShape(iconShape.dp)).background(iconColor), contentAlignment=Alignment.Center){ Text("⚙️", fontSize=16.sp) }
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    }
-                }
-            }
-        }
-        item{
-            Card(shape=RoundedCornerShape(16.dp), colors=CardDefaults.cardColors(containerColor=Color(0xFF1E1E1E))){
-                Column(Modifier.padding(12.dp)){
-                    Text("Blur: ${blur.toInt()}%", color=Color.White, fontSize=11.sp)
-                    Slider(value=blur, onValueChange={ onBlur(it) }, valueRange=0f..100f, colors=SliderDefaults.colors(thumbColor=orange, activeTrackColor=orange))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun WallpaperTab(wallpapers:List<Brush>, onWallpapers:(List<Brush>)->Unit, selected:Brush?, onSelected:(Brush?)->Unit, orange:Color){
-    LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement=Arrangement.spacedBy(12.dp)){
-        item{ Text("خلفيات Lockscreen - توليد", color=Color.White, fontWeight=FontWeight.Black, fontSize=13.sp) }
-        item{
-            Button(
-                onClick={
-                    val brushes = listOf(
-                        Brush.linearGradient(listOf(Color(0xFFFF6A00), Color(0xFF1A1A1A))),
-                        Brush.linearGradient(listOf(Color(0xFF00D1FF), Color(0xFF0F0F0F))),
-                        Brush.linearGradient(listOf(Color(0xFFFF0055), Color(0xFFFF6A00))),
-                        Brush.linearGradient(listOf(Color(0xFF00FF88), Color.Black)),
-                        Brush.radialGradient(listOf(Color(0xFFFF6A00), Color.Black))
-                    )
-                    onWallpapers(brushes)
-                    onSelected(brushes.random())
-                },
-                modifier=Modifier.fillMaxWidth(),
-                colors=ButtonDefaults.buttonColors(containerColor=orange)
-            ){
-                Text("🎨 توليد 5 خلفيات Gradient", color=Color.Black, fontWeight=FontWeight.Black, fontSize=11.sp)
-            }
-        }
-        item{
-            if(wallpapers.isNotEmpty()){
-                LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                    items(wallpapers){ brush ->
-                        Box(Modifier.size(75.dp).clip(RoundedCornerShape(12.dp)).background(brush).border(2.dp, if(selected==brush) orange else Color.Transparent, RoundedCornerShape(12.dp)).clickable{ onSelected(brush) })
-                    }
-                }
-            }
-        }
-        item{
-            if(selected!=null){
-                Box(Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(16.dp)).background(selected), contentAlignment=Alignment.Center){
-                    Text("Lockscreen Preview", color=Color.White, fontWeight=FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PreviewTab(iconShape:Int, iconColor:Color, statusColor:Color, brush:Brush?, dark:Color){
-    LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement=Arrangement.spacedBy(12.dp)){
-        item{ Text("معاينة مباشرة Live Preview", color=Color.White, fontWeight=FontWeight.Black, fontSize=13.sp) }
-        item{
-            Box(Modifier.fillMaxWidth().height(420.dp).clip(RoundedCornerShape(24.dp)).background(brush?: Brush.linearGradient(listOf(dark, Color(0xFF1A1A1A)))).border(3.dp, Color.Gray.copy(0.3f), RoundedCornerShape(24.dp))){
-                Column(Modifier.fillMaxSize()){
-                    Row(Modifier.fillMaxWidth().height(32.dp).background(statusColor.copy(0.9f)).padding(horizontal=12.dp), verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.SpaceBetween){
-                        Text("9:41", color=Color.White, fontSize=12.sp, fontWeight=FontWeight.Bold)
-                        Text("39%", color=Color.White, fontSize=10.sp)
-                    }
-                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment=Alignment.Center){
-                        Column(horizontalAlignment=Alignment.CenterHorizontally){
-                            Text("Mon, 12 May", color=Color.White.copy(0.7f), fontSize=12.sp)
-                            Text("9:41", color=Color.White, fontSize=32.sp, fontWeight=FontWeight.Black)
-                            Spacer(Modifier.height(12.dp))
-                            Box(Modifier.size(58.dp).clip(RoundedCornerShape(iconShape.dp)).background(iconColor), contentAlignment=Alignment.Center){ Text("🔒", fontSize=26.sp) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun DropBox(title:String, items:List<ThemePart>, modifier: Modifier, orange:Color){
-    Card(
-        modifier=modifier.height(90.dp).border(2.dp, if(items.isEmpty()) Color.Gray.copy(0.3f) else orange, RoundedCornerShape(12.dp)),
-        shape=RoundedCornerShape(12.dp),
-        colors=CardDefaults.cardColors(containerColor=if(items.isEmpty()) Color(0xFF151515) else Color(0xFF1E1E1E))
-    ) {
-        Column(Modifier.fillMaxSize().padding(8.dp)){
-            Text(title, color=if(items.isEmpty()) Color.Gray else orange, fontWeight=FontWeight.Black, fontSize=9.sp)
-            if(items.isEmpty()){
-                Box(Modifier.fillMaxSize(), contentAlignment=Alignment.Center){
-                    Text("اسحب هنا", color=Color.Gray.copy(0.5f), fontSize=8.sp)
-                }
-            } else {
-                Column{
-                    items.take(2).forEach{
-                        Text("• ${it.emoji} ${it.title}", color=Color.White, fontSize=8.sp)
                     }
                 }
             }
