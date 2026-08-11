@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,8 +30,8 @@ class MainActivity : ComponentActivity() {
                     item {
                         Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = orange)) {
                             Column(Modifier.padding(20.dp)) {
-                                Text("Welcome Fouad - Build SUCCESS", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.Black)
-                                Text("All Systems Ready", color = Color.Black.copy(0.7f))
+                                Text("Welcome Fouad", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                                Text("Build #7 - All Systems Ready", color = Color.Black.copy(0.7f))
                             }
                         }
                     }
@@ -40,7 +39,7 @@ class MainActivity : ComponentActivity() {
                     item { ItemCard("Control Center Blur","Blur + Orange accent") }
                     item { ItemCard("SystemUI Orange","Status bar & Volume panel") }
                     item { ItemCard("Boot Animation","Custom Orange boot") }
-                    item { ItemCard("MTZ Builder","Build theme file") }
+                    item { ItemCard("MTZ Builder","Build theme file .mtz") }
                     item {
                         Button(onClick = {}, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = orange), shape = RoundedCornerShape(16.dp)) {
                             Text("BUILD MTZ NOW", fontWeight = FontWeight.Black, color = Color.Black)
